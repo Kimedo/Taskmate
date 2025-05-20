@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Taskmate — Панель управления</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .hidden {
+      display: none;
+    }
+    .error {
+      color: red;
+      margin: 10px 0;
+    }
+    .task-item {
+      position: relative;
+      padding-right: 60px;
+      margin-bottom: 10px;
+      border: 1px solid #dee2e6;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .task-item .delete-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: red;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+      margin-top: 20px;
+      background: #dee2e6;
+    }
+    .calendar-day {
+      border: 1px solid #dee2e6;
+      padding: 5px;
+      min-height: 120px;
+      background: #fff;
+      position: relative;
+    }
+    .calendar-day:hover {
+      background: #f8f9fa;
+    }
+    .calendar-day-header {
+      font-weight: bold;
+      text-align: center;
+      padding: 5px;
+      background: #e9ecef;
+    }
+    .calendar-task-count {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: #007bff;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 50%;
+      font-size: 12px;
+      min-width: 16px;
+      text-align: center;
+    }
+    .calendar-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .calendar-day span {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    .task-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      width: 300px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .task-modal.active {
+      display: block;
+      animation: modalFadeIn 0.3s ease forwards;
+    }
+    .task-modal:not(.active) {
+      animation: modalFadeOut 0.3s ease forwards;
+    }
+    .task-modal-content {
+      margin-bottom: 15px;
+    }
+    .task-modal-content h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .task-modal-content ul {
+      list-style: none;
+      padding: 0;
+    }
+    .task-modal-content .task-mini-block {
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #f8f9fa;
+    }
+    .task-mini-block h4 {
+      margin: 0 0 5px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .task-mini-block p {
+      margin: 5px 0;
+      font-size: 12px;
+      color: #555;
+    }
+    .task-mini-block .priority-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    .task-mini-block .priority-dot.low { background: green; }
+    .task-mini-block .priority-dot.medium { background: orange; }
+    .task-mini-block .priority-dot.high { background: red; }
+    .task-mini-block .delete-btn {
+      color: red;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-size: 12px;
+    }
+    .close-modal {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      color: #333;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    @keyframes modalFadeOut {
+      from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      to { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-wrapper">
+    <aside class="sidebar">
+      <div class="user-section">
+        <img src="icon.svg" alt="User Avatar" class="user-avatar" />
+        <button id="userButton" class="user-name">kindmikee ▾</button>
+        <ul id="dropdownMenu" class="dropdown hidden">
+          <li><a href="#">Профиль</a></li>
+          <li><a href="#">Настройки</a></li>
+          <li><button id="logoutBtn">Выйти</button></li>
+        </ul>
+      </div>
+
+      <nav class="sidebar-menu">
+        <button class="menu-button add-task">➕ Добавить задачу</button>
+        <button class="menu-button">📋 Задачи на сегодня</button>
+        <button class="menu-button">📆 Календарь</button>
+        <button class="menu-button">⏱️ Помодоро таймер</button>
+
+        <div class="projects-block">
+          <h3 class="projects-title">Мои категории</h3>
+          <ul class="projects-list">
+            <li class="project-item" data-category="Учёба">Учёба<span class="project-count" id="count-study">0</span></li>
+            <li class="project-item" data-category="Работа">Работа<span class="project-count" id="count-work">0</span></li>
+            <li class="project-item" data-category="Здоровье">Здоровье<span class="project-count" id="count-health">0</span></li>
+            <li class="project-item" data-category="Другое">Другое<span class="project-count" id="count-other">0</span></li>
+          </ul>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <section id="welcome-screen" class="content-section active">
+        <h1 class="main-heading">Добро пожаловать в Taskmate</h1>
+        <p class="main-text">Выберите пункт меню слева, чтобы начать работу.</p>
+        <p id="auth-error" class="error"></p>
+      </section>
+
+      <section id="tasks-section" class="content-section">
+        <h2 class="main-heading">📋 Задачи на сегодня</h2>
+        <ul id="task-list"></ul>
+      </section>
+
+      <section id="calendar-section" class="content-section">
+        <h2 class="main-heading">📆 Календарь</h2>
+        <div class="calendar-nav">
+          <button id="prev-month">Предыдущий</button>
+          <h3 id="current-month"></h3>
+          <button id="next-month">Следующий</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid">
+        </div>
+      </section>
+
+      <section id="pomodoro-section" class="content-section">
+        <h2 class="main-heading" style="text-align: center;">⏱️ Помодоро Таймер</h2>
+        <div class="pomodoro-container">
+          <div class="pomodoro-timer">
+            <span id="timer-label">Работа</span>
+            <div id="time-display">25:00</div>
+            <div class="pomodoro-controls">
+              <button id="start-btn">Старт</button>
+              <button id="pause-btn">Пауза</button>
+              <button id="reset-btn">Сброс</button>
+            </div>
+          </div>
+
+          <div class="pomodoro-settings">
+            <h3>Настройки</h3>
+            <label>Работа (мин): <input type="number" id="work-duration" value="25" min="1" /></label>
+            <label>Короткий перерыв (мин): <input type="number" id="short-break" value="5" min="1" /></label>
+            <label>Длинный перерыв (мин): <input type="number" id="long-break" value="15" min="1" /></label>
+            <label>Циклов до длинного перерыва: <input type="number" id="cycles" value="4" min="1" /></label>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="task-panel" class="task-panel hidden" style="position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 320px; z-index: 1000;">
+    <div class="task-header">
+      <input type="text" class="task-title" placeholder="Название задачи" />
+      <textarea class="task-description" placeholder="Описание"></textarea>
+    </div>
+
+    <div class="task-options">
+      <div class="task-field">
+        <label for="task-start">📅 Начало (опционально):</label>
+        <input type="date" id="task-start" class="task-input" />
+      </div>
+      <div class="task-field">
+        <label for="task-end">📅 Конец (опционально):</label>
+        <input type="date" id="task-end" class="task-input" />
+      </div>
+      <div class="task-field">
+        <label for="task-due-date">📅 Срок выполнения:</label>
+        <input type="date" id="task-due-date" class="task-input" />
+      </div>
+      <div class="task-field">
+        <label for="task-priority">🏁 Приоритет:</label>
+        <select id="task-priority" class="task-input">
+          <option value="low">Низкий</option>
+          <option value="medium" selected>Средний</option>
+          <option value="high">Высокий</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="task-footer" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+      <select class="task-category">
+        <option value="Учёба">Учёба</option>
+        <option value="Работа">Работа</option>
+        <option value="Здоровье">Здоровье</option>
+        <option value="Другое">Другое</option>
+      </select>
+      <div class="task-actions">
+        <button class="cancel-button">Отмена</button>
+        <button class="add-button">Добавить задачу</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="task-modal" class="task-modal">
+    <button class="close-modal">×</button>
+    <div id="modal-content" class="task-modal-content"></div>
+  </div>
+
+<script>
+  // Проверка авторизации
+  async function checkAuth() {
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/me', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Вы не авторизованы');
+      const data = await response.json();
+      localStorage.setItem('userId', data.userId);
+      document.getElementById('welcome-screen').classList.remove('active');
+      document.getElementById('tasks-section').classList.add('active');
+      loadTasks();
+      updateCategoryCounts();
+    } catch (err) {
+      document.getElementById('auth-error').textContent = 'Пожалуйста, войдите в систему. ' + err.message;
+      document.getElementById('welcome-screen').classList.add('active');
+      document.getElementById('tasks-section').classList.remove('active');
+    }
+  }
+
+  // Загрузка задач
+  async function loadTasks() {
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) throw new Error('userId не найден в localStorage');
+      const response = await fetch(`http://localhost:3000/api/tasks?userId=${userId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ошибка загрузки задач: ${response.status} - ${errorText}`);
+      }
+      const tasks = await response.json();
+      console.log('Загруженные задачи:', tasks);
+      const taskList = document.getElementById('task-list');
+      taskList.innerHTML = '';
+      const today = new Date('2025-05-20T15:40:00+03:00'); // Текущая дата и время: 03:40 PM EEST, 20 мая 2025
+      const todayStr = today.toLocaleDateString('en-CA');
+      console.log('Сегодняшняя дата:', todayStr);
+
+      const uniqueTasks = {};
+      tasks.forEach(task => {
+        if (!task.title) return;
+        const taskDueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-CA') : null;
+        const taskStartStr = task.start ? new Date(task.start).toLocaleDateString('en-CA') : null;
+        const taskEndStr = task.end ? new Date(task.end).toLocaleDateString('en-CA') : null;
+
+        if ((taskDueDateStr && taskDueDateStr === todayStr) ||
+            (taskStartStr && taskEndStr && todayStr >= taskStartStr && todayStr <= taskEndStr)) {
+          const key = `${task.title}-${task.category || 'Другое'}`;
+          if (!uniqueTasks[key]) {
+            uniqueTasks[key] = task;
+          }
+        }
+      });
+
+      Object.values(uniqueTasks).forEach(task => {
+        const taskItem = document.createElement('li');
+        taskItem.classList.add('task-item', task.priority);
+        let durationDays = task.durationDays || 1;
+        if (task.start && task.end) {
+          const startDate = new Date(task.start);
+          const endDate = new Date(task.end);
+          durationDays = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+        }
+        const priorityLabels = {
+          low: 'Низкий',
+          medium: 'Средний',
+          high: 'Высокий'
+        };
+        taskItem.innerHTML = `
+          <div class="task-header">
+            <h3 class="task-title">${task.title}</h3>
+            <span class="task-priority ${task.priority}">●</span>
+          </div>
+          ${task.description ? `<p class="task-description">${task.description}</p>` : '<p class="task-description">Описание отсутствует</p>'}
+          <div class="task-meta">
+            <span class="task-due-date">Срок: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString('ru-RU') : 'не указан'} (длительность: ${durationDays} дн.)</span>
+            <span class="task-category">Категория: ${task.category || 'Другое'}</span>
+          </div>
+          <p><span class="priority-dot ${task.priority}"></span> Приоритет: ${priorityLabels[task.priority]}</p>
+          <button class="delete-btn" data-id="${task._id}">Удалить</button>
+        `;
+        taskList.appendChild(taskItem);
+      });
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const taskId = btn.dataset.id;
+          await deleteTask(taskId);
+        });
+      });
+      updateCategoryCounts(tasks);
+    } catch (err) {
+      document.getElementById('auth-error').textContent = err.message;
+      console.error('Ошибка в loadTasks:', err);
+    }
+  }
+
+  // Календарь
+  let currentDate = new Date('2025-05-20T15:40:00+03:00');
+  let currentMonth = currentDate.getMonth();
+  let currentYear = currentDate.getFullYear();
+  let tasksCache = [];
+  let isRendering = false;
+
+  async function fetchTasksForCalendar() {
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) throw new Error('userId не найден в localStorage');
+      const response = await fetch(`http://localhost:3000/api/tasks?userId=${userId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ошибка загрузки задач: ${response.status} - ${errorText}`);
+      }
+      tasksCache = await response.json();
+      console.log('Tasks for calendar:', tasksCache);
+      return tasksCache;
+    } catch (err) {
+      document.getElementById('auth-error').textContent = err.message;
+      console.error('Ошибка в fetchTasksForCalendar:', err);
+      return [];
+    }
+  }
+
+  async function fetchTasksForDay(dateStr) {
+    try {
+      const userId = localStorage.getItem('userId');
+      const response = await fetch(`http://localhost:3000/api/tasks?userId=${userId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ошибка загрузки задач: ${response.status} - ${errorText}`);
+      }
+      const tasks = await response.json();
+      return tasks.filter(task => {
+        const taskDueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-CA') : null;
+        const taskStartStr = task.start ? new Date(task.start).toLocaleDateString('en-CA') : null;
+        const taskEndStr = task.end ? new Date(task.end).toLocaleDateString('en-CA') : null;
+        return (taskDueDateStr && taskDueDateStr === dateStr) ||
+               (taskStartStr && taskEndStr && dateStr >= taskStartStr && dateStr <= taskEndStr);
+      });
+    } catch (err) {
+      document.getElementById('auth-error').textContent = err.message;
+      console.error('Ошибка в fetchTasksForDay:', err);
+      return [];
+    }
+  }
+
+  async function renderCalendar() {
+    if (isRendering) return;
+    isRendering = true;
+
+    const calendarGrid = document.getElementById('calendar-grid');
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+
+    calendarGrid.innerHTML = '';
+
+    const daysOfWeek = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    daysOfWeek.forEach(day => {
+      const dayHeader = document.createElement('div');
+      dayHeader.classList.add('calendar-day-header');
+      dayHeader.textContent = day;
+      calendarGrid.appendChild(dayHeader);
+    });
+
+    document.getElementById('current-month').textContent = `${currentDate.toLocaleString('ru-RU', { month: 'long' })} ${currentYear}`;
+
+    for (let i = 0; i < adjustedFirstDay; i++) {
+      const emptyDay = document.createElement('div');
+      emptyDay.classList.add('calendar-day');
+      calendarGrid.appendChild(emptyDay);
+    }
+
+    try {
+      const tasks = await fetchTasksForCalendar();
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayDiv = document.createElement('div');
+        dayDiv.classList.add('calendar-day');
+        dayDiv.innerHTML = `<span>${day}</span>`;
+        const currentDay = new Date(currentYear, currentMonth, day);
+        const currentDayStr = currentDay.toLocaleDateString('en-CA');
+
+        const taskCount = tasks.reduce((count, task) => {
+          const taskDueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-CA') : null;
+          const taskStartStr = task.start ? new Date(task.start).toLocaleDateString('en-CA') : null;
+          const taskEndStr = task.end ? new Date(task.end).toLocaleDateString('en-CA') : null;
+          if ((taskDueDateStr && taskDueDateStr === currentDayStr) ||
+              (taskStartStr && taskEndStr && currentDayStr >= taskStartStr && currentDayStr <= taskEndStr)) {
+            count++;
+          }
+          return count;
+        }, 0);
+
+        if (taskCount > 0) {
+          const taskCountEl = document.createElement('div');
+          taskCountEl.classList.add('calendar-task-count');
+          taskCountEl.textContent = taskCount;
+          dayDiv.appendChild(taskCountEl);
+        }
+
+        dayDiv.addEventListener('click', async (e) => {
+          if (!e.target.classList.contains('calendar-task-count')) {
+            const selectedDate = new Date(currentYear, currentMonth, day).toLocaleDateString('en-CA');
+            const tasks = await fetchTasksForDay(selectedDate);
+            showModal(selectedDate, tasks);
+          }
+        });
+
+        calendarGrid.appendChild(dayDiv);
+      }
+    } catch (err) {
+      console.error('Ошибка в renderCalendar:', err);
+    } finally {
+      isRendering = false;
+    }
+  }
+
+  function showModal(dateStr, tasks) {
+    const modal = document.getElementById('task-modal');
+    const modalContent = document.getElementById('modal-content');
+    const priorityLabels = {
+      low: 'Низкий',
+      medium: 'Средний',
+      high: 'Высокий'
+    };
+    modalContent.innerHTML = `
+      <h3>Задачи на ${new Date(dateStr).toLocaleDateString('ru-RU')}</h3>
+      <ul>
+        ${
+          tasks.length > 0
+            ? tasks.map(task => {
+                let durationDays = task.durationDays || 1;
+                if (task.start && task.end) {
+                  const startDate = new Date(task.start);
+                  const endDate = new Date(task.end);
+                  durationDays = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                }
+                return `
+                  <li class="task-mini-block">
+                    <h4>${task.title}</h4>
+                    ${task.description ? `<p>Описание: ${task.description}</p>` : ''}
+                    <p>Срок: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString('ru-RU') : 'не указан'} (длительность: ${durationDays} дн.)</p>
+                    <p><span class="priority-dot ${task.priority}"></span> Приоритет: ${priorityLabels[task.priority]}</p>
+                    <p>Категория: ${task.category || 'Другое'}</p>
+                    <button class="delete-btn" data-id="${task._id}">Удалить</button>
+                  </li>
+                `;
+              }).join('')
+            : '<li>Нет задач</li>'
+        }
+      </ul>
+    `;
+    modal.style.display = 'block';
+    modal.classList.add('active');
+
+    // Очистка старых обработчиков событий
+    modal.removeEventListener('click', handleModalClick);
+    modal.addEventListener('click', handleModalClick);
+
+    function handleModalClick(e) {
+      const target = e.target;
+      if (target.classList.contains('delete-btn')) {
+        const taskId = target.dataset.id;
+        deleteTask(taskId).then(() => {
+          hideModal();
+          renderCalendar();
+        });
+      }
+    }
+  }
+
+  function hideModal() {
+    const modal = document.getElementById('task-modal');
+    modal.classList.remove('active');
+    modal.addEventListener('animationend', () => {
+      modal.style.display = 'none';
+    }, { once: true });
+  }
+
+  document.querySelector('.close-modal').addEventListener('click', () => {
+    hideModal();
+  });
+
+  document.getElementById('prev-month').addEventListener('click', () => {
+    currentMonth--;
+    if (currentMonth < 0) {
+      currentMonth = 11;
+      currentYear--;
+    }
+    currentDate = new Date(currentYear, currentMonth, 1);
+    renderCalendar();
+  });
+
+  document.getElementById('next-month').addEventListener('click', () => {
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+    currentDate = new Date(currentYear, currentMonth, 1);
+    renderCalendar();
+  });
+
+  function openTaskPanel(date) {
+    resetTaskPanel();
+    taskPanel.querySelector('#task-start').value = date;
+    taskPanel.querySelector('#task-end').value = date;
+    taskPanel.querySelector('#task-due-date').value = date;
+    taskPanel.classList.remove('hidden');
+  }
+
+  const addButton = document.querySelector('.add-button');
+  addButton.addEventListener('click', async () => {
+    const title = taskPanel.querySelector('.task-title').value.trim();
+    if (!title) {
+      alert('Введите название задачи!');
+      return;
+    }
+    const description = taskPanel.querySelector('.task-description').value.trim();
+    const start = taskPanel.querySelector('#task-start').value;
+    const end = taskPanel.querySelector('#task-end').value;
+    let dueDate = taskPanel.querySelector('#task-due-date').value;
+    const priority = taskPanel.querySelector('#task-priority').value;
+    const category = taskPanel.querySelector('.task-category').value;
+    const userId = localStorage.getItem('userId');
+
+    if (end && !dueDate) {
+      dueDate = end;
+      taskPanel.querySelector('#task-due-date').value = end;
+    }
+
+    if (!dueDate) {
+      alert('Укажите срок выполнения задачи!');
+      return;
+    }
+
+    if (!userId) {
+      alert('Ошибка: пользователь не авторизован');
+      return;
+    }
+
+    try {
+      const baseTask = { title, description, priority, category, userId };
+      console.log('Отправляемая задача:', baseTask);
+
+      let durationDays = 1;
+      if (start && end) {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        if (startDate > endDate) {
+          alert('Дата начала не может быть позже даты окончания!');
+          return;
+        }
+        durationDays = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+        baseTask.start = start;
+        baseTask.end = end;
+      }
+      baseTask.dueDate = dueDate;
+      baseTask.durationDays = durationDays;
+
+      const response = await fetch('http://localhost:3000/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(baseTask),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ошибка добавления задачи: ${response.status} - ${errorText}`);
+      }
+
+      await fetchTasksForCalendar();
+
+      taskPanel.classList.add('hidden');
+      resetTaskPanel();
+      showSection('calendar-section');
+      renderCalendar();
+      loadTasks();
+      updateCategoryCounts();
+
+      const modal = document.getElementById('task-modal');
+      if (modal.classList.contains('active')) {
+        const selectedDate = dueDate || start;
+        if (selectedDate) {
+          const tasks = await fetchTasksForDay(selectedDate);
+          showModal(selectedDate, tasks);
+        }
+      }
+    } catch (err) {
+      document.getElementById('auth-error').textContent = err.message;
+      console.error('Ошибка в addButton:', err);
+    }
+  });
+
+  async function deleteTask(taskId) {
+    try {
+      const response = await fetch(`http://localhost:3000/api/tasks/${taskId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ошибка удаления задачи: ${response.status} - ${errorText}`);
+      }
+      await fetchTasksForCalendar();
+      loadTasks();
+      renderCalendar();
+      updateCategoryCounts();
+    } catch (err) {
+      document.getElementById('auth-error').textContent = err.message;
+      console.error('Ошибка в deleteTask:', err);
+    }
+  }
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try {
+      await fetch('http://localhost:3000/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      localStorage.removeItem('userId');
+      window.location.href = '/index.html';
+    } catch (err) {
+      document.getElementById('auth-error').textContent = 'Ошибка при выходе: ' + err.message;
+      console.error('Ошибка в logoutBtn:', err);
+    }
+  });
+
+  const userButton = document.getElementById("userButton");
+  const dropdownMenu = document.getElementById("dropdownMenu");
+  userButton.addEventListener("click", (e) => {
+    e.stopPropagation();
+    dropdownMenu.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", () => {
+    if (!dropdownMenu.classList.contains("hidden")) {
+      dropdownMenu.classList.add("hidden");
+    }
+  });
+
+  const addTaskBtn = document.querySelector('.add-task');
+  const taskPanel = document.getElementById('task-panel');
+  const cancelBtn = document.querySelector('.cancel-button');
+
+  addTaskBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetTaskPanel();
+    taskPanel.classList.remove('hidden');
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    taskPanel.classList.add('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!taskPanel.contains(e.target) && !addTaskBtn.contains(e.target)) {
+      taskPanel.classList.add('hidden');
+    }
+  });
+
+  const sections = document.querySelectorAll('.content-section');
+  const menuButtons = document.querySelectorAll('.menu-button');
+  const sectionIds = ['tasks-section', 'calendar-section', 'pomodoro-section'];
+  menuButtons.forEach((btn, index) => {
+    if (index >= 1 && index <= 3) {
+      btn.addEventListener('click', () => {
+        showSection(sectionIds[index - 1]);
+        if (sectionIds[index - 1] === 'calendar-section') {
+          renderCalendar();
+        } else if (sectionIds[index - 1] === 'tasks-section') {
+          loadTasks();
+        }
+      });
+    }
+  });
+
+  function showSection(id) {
+    sections.forEach(sec => sec.classList.remove('active'));
+    const activeSection = document.getElementById(id);
+    if (activeSection) activeSection.classList.add('active');
+  }
+
+  let timer;
+  let isRunning = false;
+  let mode = 'work';
+  let timeLeft = 1500;
+  let cycleCount = 0;
+
+  function updateDisplay() {
+    const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+    const seconds = String(timeLeft % 60).padStart(2, '0');
+    document.getElementById('time-display').textContent = `${minutes}:${seconds}`;
+    document.getElementById('timer-label').textContent =
+      mode === 'work' ? 'Работа' : mode === 'short' ? 'Короткий перерыв' : 'Длинный перерыв';
+  }
+
+  function startTimer() {
+    if (isRunning) return;
+    isRunning = true;
+    timer = setInterval(() => {
+      if (timeLeft > 0) {
+        timeLeft--;
+        updateDisplay();
+      } else {
+        clearInterval(timer);
+        isRunning = false;
+        switchMode();
+      }
+    }, 1000);
+  }
+
+  function pauseTimer() {
+    clearInterval(timer);
+    isRunning = false;
+  }
+
+  function resetTimer() {
+    clearInterval(timer);
+    isRunning = false;
+    setInitialTime();
+    updateDisplay();
+  }
+
+  function switchMode() {
+    const work = +document.getElementById('work-duration').value * 60;
+    const short = +document.getElementById('short-break').value * 60;
+    const long = +document.getElementById('long-break').value * 60;
+    const cycles = +document.getElementById('cycles').value;
+
+    if (mode === 'work') {
+      cycleCount++;
+      if (cycleCount % cycles === 0) {
+        mode = 'long';
+        timeLeft = long;
+      } else {
+        mode = 'short';
+        timeLeft = short;
+      }
+    } else {
+      mode = 'work';
+      timeLeft = work;
+    }
+    updateDisplay();
+    startTimer();
+  }
+
+  function setInitialTime() {
+    const work = +document.getElementById('work-duration').value * 60;
+    timeLeft = work;
+    mode = 'work';
+  }
+
+  document.getElementById('start-btn').addEventListener('click', startTimer);
+  document.getElementById('pause-btn').addEventListener('click', pauseTimer);
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    resetTimer();
+    cycleCount = 0;
+  });
+
+  setInitialTime();
+  updateDisplay();
+
+  function resetTaskPanel() {
+    taskPanel.querySelector('.task-title').value = '';
+    taskPanel.querySelector('.task-description').value = '';
+    taskPanel.querySelector('#task-start').value = '';
+    taskPanel.querySelector('#task-end').value = '';
+    taskPanel.querySelector('#task-due-date').value = '';
+    taskPanel.querySelector('#task-priority').value = 'medium';
+    taskPanel.querySelector('.task-category').value = 'Другое';
+  }
+
+  async function fetchAllTasks() {
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) throw new Error('userId не найден в localStorage');
+      const response = await fetch(`http://localhost:3000/api/tasks?userId=${userId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Ошибка загрузки задач: ${response.status} - ${errorText}`);
+      }
+      const tasks = await response.json();
+      const uniqueTasks = {};
+      tasks.forEach(task => {
+        const key = `${task.title}-${task.category || 'Другое'}`;
+        if (!uniqueTasks[key]) {
+          uniqueTasks[key] = task;
+        }
+      });
+      return Object.values(uniqueTasks);
+    } catch (err) {
+      document.getElementById('auth-error').textContent = err.message;
+      console.error('Ошибка в fetchAllTasks:', err);
+      return [];
+    }
+  }
+
+  async function displayTasksByCategory(category) {
+    const tasks = await fetchAllTasks();
+    const filteredTasks = tasks.filter(task => task.category === category);
+    const modal = document.getElementById('task-modal');
+    const modalContent = document.getElementById('modal-content');
+    const priorityLabels = {
+      low: 'Низкий',
+      medium: 'Средний',
+      high: 'Высокий'
+    };
+    modalContent.innerHTML = `
+      <h3>Задачи категории: ${category}</h3>
+      <ul>
+        ${
+          filteredTasks.length > 0
+            ? filteredTasks.map(task => {
+                let durationDays = 1;
+                if (task.start && task.end) {
+                  const startDate = new Date(task.start);
+                  const endDate = new Date(task.end);
+                  durationDays = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+                }
+                return `
+                  <li class="task-mini-block">
+                    <h4>${task.title}</h4>
+                    ${task.description ? `<p>Описание: ${task.description}</p>` : ''}
+                    <p>Срок: ${task.dueDate ? new Date(task.dueDate).toLocaleDateString('ru-RU') : 'не указан'} (длительность: ${durationDays} дн.)</p>
+                    <p><span class="priority-dot ${task.priority}"></span> Приоритет: ${priorityLabels[task.priority]}</p>
+                    <button class="delete-btn" data-id="${task._id}">Удалить</button>
+                  </li>
+                `;
+              }).join('')
+            : '<li>Нет задач</li>'
+        }
+      </ul>
+    `;
+    modal.style.display = 'block';
+    modal.classList.add('active');
+
+    // Очистка старых обработчиков событий
+    modal.removeEventListener('click', handleCategoryModalClick);
+    modal.addEventListener('click', handleCategoryModalClick);
+
+    function handleCategoryModalClick(e) {
+      const target = e.target;
+      if (target.classList.contains('delete-btn')) {
+        const taskId = target.dataset.id;
+        deleteTask(taskId).then(() => {
+          // Обновляем модальное окно после удаления
+          displayTasksByCategory(category);
+        });
+      }
+    }
+  }
+
+  function updateCategoryCounts(tasks = null) {
+    if (!tasks) {
+      fetchAllTasks().then(tasks => {
+        const counts = {
+          'Учёба': 0,
+          'Работа': 0,
+          'Здоровье': 0,
+          'Другое': 0
+        };
+        tasks.forEach(task => {
+          counts[task.category || 'Другое']++;
+        });
+        document.getElementById('count-study').textContent = counts['Учёба'];
+        document.getElementById('count-work').textContent = counts['Работа'];
+        document.getElementById('count-health').textContent = counts['Здоровье'];
+        document.getElementById('count-other').textContent = counts['Другое'];
+      });
+    } else {
+      const counts = {
+        'Учёба': 0,
+        'Работа': 0,
+        'Здоровье': 0,
+        'Другое': 0
+      };
+      const uniqueTasks = {};
+      tasks.forEach(task => {
+        const key = `${task.title}-${task.category || 'Другое'}`;
+        if (!uniqueTasks[key]) {
+          uniqueTasks[key] = task;
+          counts[task.category || 'Другое']++;
+        }
+      });
+      document.getElementById('count-study').textContent = counts['Учёба'];
+      document.getElementById('count-work').textContent = counts['Работа'];
+      document.getElementById('count-health').textContent = counts['Здоровье'];
+      document.getElementById('count-other').textContent = counts['Другое'];
+    }
+  }
+
+  document.querySelectorAll('.project-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const category = item.getAttribute('data-category');
+      displayTasksByCategory(category);
+    });
+  });
+
+  checkAuth();
+</script>
+</body>
+</html>
