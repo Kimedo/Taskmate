@@ -1,2 +1,0 @@
-# Taskmate
-Task manager
